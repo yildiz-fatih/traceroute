@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"log"
 	"net"
@@ -47,23 +48,40 @@ func main() {
 
 		conn.WriteTo(msgBytes, ipAddr)
 
-		responseBytes := make([]byte, 1500)
+		// --- wait for response ---
+		found := false
+		for {
+			responseBytes := make([]byte, 1500)
 
-		_, _, err = conn.ReadFrom(responseBytes)
-		if err != nil { // timeout or other error
-			fmt.Println("*")
-			continue
-		}
+			_, _, err = conn.ReadFrom(responseBytes)
+			if err != nil { // timeout or other error
+				fmt.Println("*")
+				break
+			}
 
-		responseMsg, err := icmp.ParseMessage(ipv4.ICMPTypeEcho.Protocol(), responseBytes)
-		if err != nil {
-			log.Fatalf("Error parsing ICMP message: %v", err)
-		}
+			responseMsg, err := icmp.ParseMessage(ipv4.ICMPTypeEcho.Protocol(), responseBytes)
+			if err != nil {
+				continue
+			}
 
-		fmt.Println(responseMsg)
+			// --- check incoming packets ---
+			switch responseMsg.Type {
+			case ipv4.ICMPTypeEchoReply:
+				// check if the packet belong to this program
+				if responseMsg.Body.(*icmp.Echo).ID == os.Getpid() {
+					return // echo reply received, end the program
+				}
+			case ipv4.ICMPTypeTimeExceeded:
+				// check if the packet belong to this program
+				if int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[24:26])) == os.Getpid() {
+					fmt.Println(responseMsg)
+					found = true
+				}
+			}
 
-		if responseMsg.Type == ipv4.ICMPTypeEchoReply {
-			return
+			if found {
+				break
+			}
 		}
 	}
 }
