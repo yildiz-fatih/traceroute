@@ -53,13 +53,13 @@ func main() {
 		for {
 			responseBytes := make([]byte, 1500)
 
-			_, responderAddr, err := conn.ReadFrom(responseBytes)
+			responseLen, responderAddr, err := conn.ReadFrom(responseBytes)
 			if err != nil { // timeout or other error
 				fmt.Printf("%d\t*\n", TTL)
 				break
 			}
 
-			responseMsg, err := icmp.ParseMessage(ipv4.ICMPTypeEcho.Protocol(), responseBytes)
+			responseMsg, err := icmp.ParseMessage(ipv4.ICMPTypeEcho.Protocol(), responseBytes[:responseLen])
 			if err != nil {
 				continue
 			}
