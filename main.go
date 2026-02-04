@@ -53,9 +53,9 @@ func main() {
 		for {
 			responseBytes := make([]byte, 1500)
 
-			_, _, err = conn.ReadFrom(responseBytes)
+			_, responderAddr, err := conn.ReadFrom(responseBytes)
 			if err != nil { // timeout or other error
-				fmt.Println("*")
+				fmt.Printf("%d\t*\n", TTL)
 				break
 			}
 
@@ -69,13 +69,13 @@ func main() {
 			case ipv4.ICMPTypeEchoReply:
 				// check if the packet belong to this program
 				if responseMsg.Body.(*icmp.Echo).ID == os.Getpid() {
-					fmt.Println(responseMsg)
+					fmt.Printf("%d\t%s\n", TTL, responderAddr.String())
 					return // echo reply received, end the program
 				}
 			case ipv4.ICMPTypeTimeExceeded:
 				// check if the packet belong to this program
 				if int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[24:26])) == os.Getpid() {
-					fmt.Println(responseMsg)
+					fmt.Printf("%d\t%s\n", TTL, responderAddr.String())
 					found = true
 				}
 			}
