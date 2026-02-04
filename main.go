@@ -25,6 +25,10 @@ func main() {
 	}
 
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		log.Fatalf("Error listening for ICMP packets: %v", err)
+	}
+	defer conn.Close()
 
 	// IANA (https://www.iana.org/assignments/ip-parameters/ip-parameters.xhtml)
 	// currently recommends default TTL of 64
