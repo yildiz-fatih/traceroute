@@ -69,6 +69,7 @@ func main() {
 			case ipv4.ICMPTypeEchoReply:
 				// check if the packet belong to this program
 				if responseMsg.Body.(*icmp.Echo).ID == os.Getpid() {
+					fmt.Println(responseMsg)
 					return // echo reply received, end the program
 				}
 			case ipv4.ICMPTypeTimeExceeded:
