@@ -74,7 +74,34 @@ func main() {
 				}
 			case ipv4.ICMPTypeTimeExceeded:
 				// check if the packet belong to this program
-				if int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[24:26])) == os.Getpid() {
+
+				/*
+				   ICMP Time Exceeded packet layout:
+				   	Outer IPv4 Header  								- bytes 0–19 	- 20 bytes (Gets this packet back to you)
+				   	Outer ICMP Header (Time Exceeded)				- bytes 20–27	- 8 bytes:
+				   	Inner Payload (Original packet that expired):
+				   		Inner IPv4 Header 							- bytes 28–47	- 20 bytes
+				   		Inner ICMP Header (first 8 bytes only) 		- bytes 48-55	- 8 bytes
+				   			- Bytes 48: Type (Echo = 8)
+				   			- Bytes 49: Code (0)
+				   			- Bytes 50-51: Checksum
+				   			- Bytes 52-53: ID 						<--- TARGET
+				   			- Bytes 54-55: Sequence Number
+				*/
+				// In Go:
+				//   responseMsg.Body.(*icmp.TimeExceeded).Data[0]		== byte 28
+				//   responseMsg.Body.(*icmp.TimeExceeded).Data[24] 	== byte 52
+				//   responseMsg.Body.(*icmp.TimeExceeded).Data[24:26]	== original ICMP ID
+
+				const (
+					innerIPv4HeaderLen = 20
+					icmpEchoIDOffset   = 4
+					icmpEchoIDLen      = 2
+				)
+
+				echoIDOffset := innerIPv4HeaderLen + icmpEchoIDOffset
+
+				if int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[echoIDOffset:echoIDOffset+icmpEchoIDLen])) == os.Getpid() {
 					fmt.Printf("%d\t%s\n", TTL, responderAddr.String())
 					found = true
 				}
