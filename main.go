@@ -13,6 +13,17 @@ import (
 )
 
 func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run main.go <destination>")
+		os.Exit(1)
+	}
+	destination := os.Args[1]
+
+	dstAddr, err := net.ResolveIPAddr("ip4", destination)
+	if err != nil {
+		log.Fatalf("Error resolving IP address: %v", err)
+	}
+
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 
 	// IANA (https://www.iana.org/assignments/ip-parameters/ip-parameters.xhtml)
@@ -45,12 +56,7 @@ func main() {
 			log.Fatalf("Error marshalling ICMP message to bytes: %v", err)
 		}
 
-		ipAddr, err := net.ResolveIPAddr("ip4", "google.com.tr")
-		if err != nil {
-			log.Fatalf("Error resolving IP address: %v", err)
-		}
-
-		conn.WriteTo(msgBytes, ipAddr)
+		conn.WriteTo(msgBytes, dstAddr)
 
 		// --- wait for response ---
 		found := false
