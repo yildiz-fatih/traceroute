@@ -15,7 +15,11 @@ import (
 func main() {
 	conn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 
-	for TTL := 1; ; TTL++ {
+	// IANA (https://www.iana.org/assignments/ip-parameters/ip-parameters.xhtml)
+	// currently recommends default TTL of 64
+	maxTTL := 64
+
+	for TTL := 1; TTL <= maxTTL; TTL++ {
 		t := time.Now().Add(time.Second * 5)
 		err = conn.SetReadDeadline(t)
 		if err != nil {
