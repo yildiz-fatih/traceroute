@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -13,11 +14,22 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
+	var queries int
+	var wait int
+	var maxTTL int
+	flag.IntVar(&queries, "q", 3, "Number of probes per hop")
+	flag.IntVar(&wait, "w", 5, "Time (in seconds) to wait for a response to a probe")
+	flag.IntVar(&maxTTL, "m", 64, "Max time-to-live (max number of hops)") // The current recommended default TTL for IP is 64 [RFC791] [RFC1122]
+
+	flag.Parse()
+
+	remainingArgs := flag.Args()
+
+	if len(remainingArgs) < 1 {
 		fmt.Println("Usage: go run main.go <destination>")
 		os.Exit(1)
 	}
-	destination := os.Args[1]
+	destination := remainingArgs[0]
 
 	dstAddr, err := net.ResolveIPAddr("ip4", destination)
 	if err != nil {
@@ -32,14 +44,13 @@ func main() {
 
 	// IANA (https://www.iana.org/assignments/ip-parameters/ip-parameters.xhtml)
 	// currently recommends default TTL of 64
-	maxTTL := 64
 	probeCounter := 1
 
 	for TTL := 1; TTL <= maxTTL; TTL++ {
 		reachedDestination := false
 		fmt.Printf("Hop %d:\n", TTL)
-		for range 3 {
-			responderAddr, elapsedTime, msgType, err := probe(conn, dstAddr, TTL, probeCounter)
+		for range queries {
+			responderAddr, elapsedTime, msgType, err := probe(conn, dstAddr, TTL, probeCounter, wait)
 			probeCounter += 1
 			if err != nil {
 				fmt.Printf("  *\n")
@@ -61,10 +72,10 @@ func main() {
 	}
 }
 
-func probe(conn *icmp.PacketConn, dstAddr *net.IPAddr, TTL int, seqNum int) (net.Addr, time.Duration, ipv4.ICMPType, error) {
+func probe(conn *icmp.PacketConn, dstAddr *net.IPAddr, TTL int, seqNum int, waitTime int) (net.Addr, time.Duration, ipv4.ICMPType, error) {
 	startTime := time.Now()
 
-	t := time.Now().Add(time.Second * 5)
+	t := time.Now().Add(time.Second * time.Duration(waitTime))
 	err := conn.SetReadDeadline(t)
 	if err != nil {
 		return nil, 0, 0, err
