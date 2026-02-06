@@ -33,22 +33,31 @@ func main() {
 	// IANA (https://www.iana.org/assignments/ip-parameters/ip-parameters.xhtml)
 	// currently recommends default TTL of 64
 	maxTTL := 64
+	probeCounter := 1
 
 	for TTL := 1; TTL <= maxTTL; TTL++ {
-		responderAddr, elapsedTime, msgType, err := probe(conn, dstAddr, TTL, TTL)
-		if err != nil {
-			fmt.Printf("%d\t*\n", TTL)
-			continue
+		reachedDestination := false
+		fmt.Printf("Hop %d:\n", TTL)
+		for range 3 {
+			responderAddr, elapsedTime, msgType, err := probe(conn, dstAddr, TTL, probeCounter)
+			probeCounter += 1
+			if err != nil {
+				fmt.Printf("  *\n")
+				continue
+			}
+
+			switch msgType {
+			case ipv4.ICMPTypeEchoReply:
+				fmt.Printf("  %-16s %s\n", responderAddr.String(), elapsedTime)
+				reachedDestination = true
+			case ipv4.ICMPTypeTimeExceeded:
+				fmt.Printf("  %-16s %s\n", responderAddr.String(), elapsedTime)
+			}
 		}
 
-		switch msgType {
-		case ipv4.ICMPTypeEchoReply:
-			fmt.Printf("%d\t%s\t%s\n", TTL, responderAddr.String(), elapsedTime)
+		if reachedDestination {
 			os.Exit(0)
-		case ipv4.ICMPTypeTimeExceeded:
-			fmt.Printf("%d\t%s\t%s\n", TTL, responderAddr.String(), elapsedTime)
 		}
-
 	}
 }
 
