@@ -13,6 +13,8 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
+var processID int = os.Getpid()
+
 func main() {
 	var queries int
 	var wait int
@@ -81,12 +83,15 @@ func probe(conn *icmp.PacketConn, dstAddr *net.IPAddr, TTL int, seqNum int, wait
 		return nil, 0, 0, err
 	}
 
+	icmpEchoIDMask := 0xffff                      // ICMP Echo Identifier fields are exactly 16 bits wide, 0xffff is 16 1's in binary
+	processIDKeep16 := processID & icmpEchoIDMask // Mask the PID with 0xffff to fit it into 16 bits
+
 	msg := icmp.Message{
 		Type:     ipv4.ICMPTypeEcho,
 		Code:     0, // Description: No Code
 		Checksum: 0, // has not been calculated yet, put 0 for now
 		Body: &icmp.Echo{
-			ID:   os.Getpid(),     // uniquely identifies this traceroute program
+			ID:   processIDKeep16, // uniquely identifies this traceroute program
 			Seq:  seqNum,          // start at 1 for now, increment later
 			Data: []byte("hello"), // can be anything, put "hello" for now
 		},
@@ -122,7 +127,7 @@ func probe(conn *icmp.PacketConn, dstAddr *net.IPAddr, TTL int, seqNum int, wait
 		switch responseMsg.Type {
 		case ipv4.ICMPTypeEchoReply:
 			// check if the packet belong to this program
-			if responseMsg.Body.(*icmp.Echo).ID == os.Getpid() && responseMsg.Body.(*icmp.Echo).Seq == seqNum {
+			if responseMsg.Body.(*icmp.Echo).ID == processIDKeep16 && responseMsg.Body.(*icmp.Echo).Seq == seqNum {
 				return responderAddr, elapsedTime, ipv4.ICMPTypeEchoReply, nil
 			}
 		case ipv4.ICMPTypeTimeExceeded:
@@ -154,7 +159,7 @@ func probe(conn *icmp.PacketConn, dstAddr *net.IPAddr, TTL int, seqNum int, wait
 				icmpEchoSeqLen     = 2
 			)
 
-			if int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[icmpEchoIDOffset:icmpEchoIDOffset+icmpEchoIDLen])) == os.Getpid() && int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[icmpEchoSeqOffset:icmpEchoSeqOffset+icmpEchoSeqLen])) == seqNum {
+			if int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[icmpEchoIDOffset:icmpEchoIDOffset+icmpEchoIDLen])) == processIDKeep16 && int(binary.BigEndian.Uint16(responseMsg.Body.(*icmp.TimeExceeded).Data[icmpEchoSeqOffset:icmpEchoSeqOffset+icmpEchoSeqLen])) == seqNum {
 				return responderAddr, elapsedTime, ipv4.ICMPTypeTimeExceeded, nil
 			}
 		}
