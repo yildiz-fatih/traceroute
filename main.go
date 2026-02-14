@@ -19,9 +19,11 @@ func main() {
 	var queries int
 	var wait int
 	var maxTTL int
+	var numeric bool
 	flag.IntVar(&queries, "q", 3, "Number of probes per hop")
 	flag.IntVar(&wait, "w", 5, "Time (in seconds) to wait for a response to a probe")
 	flag.IntVar(&maxTTL, "m", 64, "Max time-to-live (max number of hops)") // The current recommended default TTL for IP is 64 [RFC791] [RFC1122]
+	flag.BoolVar(&numeric, "n", false, "Print hop addresses numerically (skip address-to-name lookup)")
 
 	flag.Parse()
 
@@ -59,12 +61,22 @@ func main() {
 				continue
 			}
 
+			displayName := responderAddr.String()
+
+			if !numeric {
+				// Reverse DNS Lookup
+				names, _ := net.LookupAddr(responderAddr.String()) // Look up the hostname for the IP address, ignore errors
+				if len(names) > 0 {                                // Hostname found
+					displayName = fmt.Sprintf("%s (%s)", names[0], responderAddr.String()) // Format: "hostname (IP address)"
+				}
+			}
+
 			switch msgType {
 			case ipv4.ICMPTypeEchoReply:
-				fmt.Printf("  %-16s %s\n", responderAddr.String(), elapsedTime)
+				fmt.Printf("  %-32s %s\n", displayName, elapsedTime)
 				reachedDestination = true
 			case ipv4.ICMPTypeTimeExceeded:
-				fmt.Printf("  %-16s %s\n", responderAddr.String(), elapsedTime)
+				fmt.Printf("  %-32s %s\n", displayName, elapsedTime)
 			}
 		}
 
